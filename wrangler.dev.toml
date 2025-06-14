@@ -1,0 +1,17 @@
+name = "component-api-dev"
+main = "src/index.ts"
+compatibility_date = "2023-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "components-db"
+database_id = "ae046e95-37ff-4c52-8d5f-7ff864ddd7e1"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "8fc50767b80e41718810f987f69d710a"
+
+[vars]
+ADMIN_PASSWORD = "19840910"
+ENVIRONMENT = "development"

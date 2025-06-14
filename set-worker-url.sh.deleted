@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# このスクリプトは実際のWorker URLを取得後に実行してください
+# 使用方法: ./set-worker-url.sh https://your-actual-worker.workers.dev
+
+if [ -z "$1" ]; then
+    echo "❌ エラー: Worker URLを指定してください"
+    echo "使用方法: $0 https://your-worker.workers.dev"
+    echo ""
+    echo "Worker URLを確認するには:"
+    echo "   npx wrangler list"
+    exit 1
+fi
+
+WORKER_URL="$1"
+FRONTEND_DIR="../component management"
+ENV_FILE="$FRONTEND_DIR/.env.local"
+
+echo "🔧 フロントエンド環境変数を手動設定中..."
+echo "Worker URL: $WORKER_URL"
+
+# バックアップ作成
+if [ -f "$ENV_FILE" ]; then
+    cp "$ENV_FILE" "$ENV_FILE.backup"
+    echo "📋 既存ファイルをバックアップ: $ENV_FILE.backup"
+fi
+
+# 新しい環境変数ファイル作成
+cat > "$ENV_FILE" << EOF
+# API Base URL - Cloudflare Workers
+VITE_API_URL=$WORKER_URL
+
+# 開発環境でリモートAPIを使用する
+VITE_DEV_USE_REMOTE=true
+
+# Environment
+VITE_ENVIRONMENT=production
+NODE_ENV=development
+EOF
+
+echo "✅ 環境変数ファイルを更新しました: $ENV_FILE"
+echo ""
+echo "📝 設定内容:"
+cat "$ENV_FILE"
+echo ""
+echo "🧪 API接続テスト:"
+curl -s "$WORKER_URL/api/health" | jq '.' 2>/dev/null || curl -s "$WORKER_URL/api/health"
+echo ""
+echo "🚀 フロントエンドを再起動してください:"
+echo "   cd '$FRONTEND_DIR'"
+echo "   npm run dev"

@@ -1,0 +1,48 @@
+#!/bin/bash
+
+echo "🔍 Component API - 現在の状況確認"
+echo "==============================="
+
+echo ""
+echo "📋 1. Cloudflareアカウント情報"
+npx wrangler whoami
+
+echo ""
+echo "📋 2. 現在のWorker一覧"
+npx wrangler list
+
+echo ""
+echo "📋 3. D1データベース一覧"
+npx wrangler d1 list
+
+echo ""
+echo "📋 4. 現在のローカル開発サーバー確認"
+echo "   ローカルAPI (http://localhost:8787) の確認..."
+
+# ローカルAPIの確認
+echo "   - ヘルスチェック:"
+curl -s http://localhost:8787/api/health | jq '.' 2>/dev/null || echo "     ❌ ローカルAPIが起動していません"
+
+echo "   - 管理者API:"
+curl -s http://localhost:8787/api/admin/stats | jq '.' 2>/dev/null || echo "     ❌ 管理者APIが動作していません"
+
+echo ""
+echo "📋 5. 本番Worker（もしデプロイ済みの場合）"
+WORKER_URL=$(npx wrangler list 2>/dev/null | grep "component-api" | awk '{print $2}' | head -1)
+
+if [ ! -z "$WORKER_URL" ]; then
+    echo "   Worker URL: $WORKER_URL"
+    echo "   - ヘルスチェック:"
+    curl -s "$WORKER_URL/api/health" | jq '.' 2>/dev/null || echo "     ❌ 本番Workerにアクセスできません"
+    
+    echo "   - 管理者API:"
+    curl -s "$WORKER_URL/api/admin/stats" | jq '.' 2>/dev/null || echo "     ❌ 管理者APIが本番に反映されていません"
+else
+    echo "   ❌ component-api Workerがデプロイされていません"
+fi
+
+echo ""
+echo "📋 次のステップ:"
+echo "   1. ローカル開発サーバーが動いていない場合: npm run dev"
+echo "   2. 本番Workerがデプロイされていない場合: ./deploy.sh"
+echo "   3. 管理者APIが本番に反映されていない場合: ./deploy.sh"

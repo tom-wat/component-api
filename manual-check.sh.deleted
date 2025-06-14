@@ -1,0 +1,60 @@
+#!/bin/bash
+
+echo "🔍 Worker URL 手動確認スクリプト"
+echo "=========================="
+
+echo ""
+echo "📋 1. 現在のWorker一覧:"
+npx wrangler list
+
+echo ""
+echo "📋 2. アカウント情報:"
+npx wrangler whoami
+
+echo ""
+echo "📋 3. component-api Workerの詳細情報:"
+npx wrangler list | grep -i component
+
+echo ""
+echo "📋 4. すべてのWorkerを詳細表示:"
+npx wrangler list --format json 2>/dev/null | jq '.[] | select(.name | contains("component")) | {name: .name, url: .url, zone: .zone}' 2>/dev/null || echo "jqコマンドが利用できません"
+
+echo ""
+echo "📋 5. Workerの状態確認:"
+WORKERS=$(npx wrangler list 2>/dev/null | tail -n +2 | awk '{print $1 " " $2}')
+
+if [ -z "$WORKERS" ]; then
+    echo "   ❌ Workerが見つかりません"
+else
+    echo "$WORKERS" | while read -r name url; do
+        if [[ "$name" == *"component"* ]]; then
+            echo "   🎯 $name: $url"
+            
+            # URLが有効かテスト
+            if [ ! -z "$url" ] && [[ "$url" == https* ]]; then
+                echo "      テスト中: $url/api/health"
+                HEALTH_CHECK=$(curl -s -w "%{http_code}" "$url/api/health" 2>/dev/null)
+                HTTP_CODE="${HEALTH_CHECK: -3}"
+                RESPONSE="${HEALTH_CHECK%???}"
+                
+                if [ "$HTTP_CODE" = "200" ]; then
+                    echo "      ✅ API正常動作 (HTTP $HTTP_CODE)"
+                    echo "      レスポンス: $RESPONSE" | head -c 100
+                else
+                    echo "      ❌ API異常 (HTTP $HTTP_CODE)"
+                fi
+            else
+                echo "      ⚠️  無効なURL: $url"
+            fi
+        fi
+    done
+fi
+
+echo ""
+echo "📝 次のステップ:"
+echo "   1. 上記でcomponent-apiのWorkerとURLを確認してください"
+echo "   2. 正しいURLが見つかったら、以下のコマンドで環境変数を手動設定:"
+echo "      echo 'VITE_API_URL=https://your-actual-worker.workers.dev' > '../component management/.env.local'"
+echo "      echo 'VITE_DEV_USE_REMOTE=true' >> '../component management/.env.local'"
+echo "      echo 'VITE_ENVIRONMENT=production' >> '../component management/.env.local'"
+echo "      echo 'NODE_ENV=development' >> '../component management/.env.local'"

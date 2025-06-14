@@ -1,0 +1,60 @@
+#!/bin/bash
+
+echo "🔧 フロントエンド環境変数更新スクリプト"
+echo "================================="
+
+# WorkerのURLを取得
+WORKER_URL=$(npx wrangler list 2>/dev/null | grep "component-api" | awk '{print $2}' | head -1)
+
+if [ -z "$WORKER_URL" ]; then
+    echo "❌ エラー: component-api Workerが見つかりません"
+    echo "   先にcomponent-apiをデプロイしてください: ./deploy.sh"
+    exit 1
+fi
+
+echo "🌐 検出されたWorker URL: $WORKER_URL"
+
+# フロントエンドディレクトリのパス
+FRONTEND_DIR="../component management"
+ENV_FILE="$FRONTEND_DIR/.env.local"
+
+if [ ! -d "$FRONTEND_DIR" ]; then
+    echo "❌ エラー: フロントエンドディレクトリが見つかりません: $FRONTEND_DIR"
+    exit 1
+fi
+
+# 現在の.env.localファイルをバックアップ
+if [ -f "$ENV_FILE" ]; then
+    cp "$ENV_FILE" "$ENV_FILE.backup"
+    echo "📋 既存の.env.localをバックアップしました: $ENV_FILE.backup"
+fi
+
+# 新しい.env.localファイルを作成
+cat > "$ENV_FILE" << EOF
+# API Base URL - Cloudflare Workers
+VITE_API_URL=$WORKER_URL
+
+# 開発環境でリモートAPIを使用する
+VITE_DEV_USE_REMOTE=true
+
+# Environment
+VITE_ENVIRONMENT=production
+NODE_ENV=development
+EOF
+
+echo "✅ フロントエンドの環境変数を更新しました"
+echo ""
+echo "📝 更新内容:"
+echo "   VITE_API_URL=$WORKER_URL"
+echo "   VITE_DEV_USE_REMOTE=true"
+echo "   VITE_ENVIRONMENT=production"
+echo ""
+echo "🚀 次のステップ:"
+echo "   1. フロントエンドディレクトリに移動:"
+echo "      cd '$FRONTEND_DIR'"
+echo "   2. 開発サーバーを再起動:"
+echo "      npm run dev"
+echo "   3. ブラウザで動作確認:"
+echo "      http://localhost:3000/"
+echo "      http://localhost:3000/debug  (API接続診断)"
+echo "      http://localhost:3000/admin  (管理者ページ)"

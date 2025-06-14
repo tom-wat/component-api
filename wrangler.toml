@@ -1,0 +1,27 @@
+name = "component-api"
+main = "src/index.ts"
+compatibility_date = "2023-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[env.production]
+name = "component-api"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "components-db"
+database_id = "ae046e95-37ff-4c52-8d5f-7ff864ddd7e1"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "8fc50767b80e41718810f987f69d710a"
+
+[vars]
+ADMIN_PASSWORD = "19840910"
+ENVIRONMENT = "development"
+ACCESS_TOKEN_EXPIRY = "1h"
+REFRESH_TOKEN_EXPIRY = "30d"
+JWT_SECRET = "dev-jwt-secret-key-2024-very-secure-development-only"
+
+# セキュアな環境変数は以下のコマンドでセットしてください:
+# wrangler secret put ADMIN_PASSWORD
+# wrangler secret put JWT_SECRET
