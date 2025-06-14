@@ -242,11 +242,12 @@ export function sanitizeHTML(html: string): string {
     sanitized = sanitized.replace(pattern, '');
   });
   
-  // Step 6: Remove empty tags and normalize whitespace
+  // Step 6: Remove empty tags but preserve formatting
   sanitized = sanitized
     .replace(/<(\w+)(\s[^>]*)?\s*><\/\1>/gi, '') // Remove empty tags
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .trim();
+    .replace(/\n\s*\n\s*\n/g, '\n\n') // Limit consecutive blank lines to 2
+    .replace(/^\s*\n/g, '') // Remove leading blank lines
+    .replace(/\n\s*$/g, ''); // Remove trailing blank lines
   
   return sanitized;
 }
@@ -312,11 +313,12 @@ export function sanitizeCSS(css: string): string {
     return match;
   });
   
-  // Step 6: Normalize whitespace and cleanup
+  // Step 6: Minimal cleanup while preserving formatting
   sanitized = sanitized
-    .replace(/\s+/g, ' ')
-    .replace(/;\s*;/g, ';')
-    .trim();
+    .replace(/;\s*;/g, ';') // Remove double semicolons
+    .replace(/\n\s*\n\s*\n/g, '\n\n') // Limit consecutive blank lines
+    .replace(/^\s*\n/g, '') // Remove leading blank lines
+    .replace(/\n\s*$/g, ''); // Remove trailing blank lines
   
   return sanitized;
 }
@@ -353,11 +355,12 @@ export function sanitizeJS(js: string): string {
     sanitized = sanitized.replace(pattern, '/* potentially dangerous code removed */');
   });
   
-  // 基本的な整形のみ
+  // 基本的な整形のみ - フォーマットを完全に保持
   sanitized = sanitized
-    .replace(/\s+/g, ' ')
-    .replace(/;\s*;/g, ';')
-    .trim();
+    .replace(/;\s*;/g, ';') // Remove double semicolons only
+    .replace(/\n\s*\n\s*\n/g, '\n\n') // Limit consecutive blank lines
+    .replace(/^\s*\n/g, '') // Remove leading blank lines
+    .replace(/\n\s*$/g, ''); // Remove trailing blank lines
   
   return sanitized || '/* Empty JavaScript content */';
 }
