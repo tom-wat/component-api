@@ -30,11 +30,16 @@ export const UpdateComponentSchema = ComponentSchema.partial().refine(
 // 許可されたHTMLタグ（ホワイトリスト方式）
 const allowedHTMLTags = [
   'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  'button', 'input', 'label', 'form', 'a',
-  'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'thead', 'tbody',
-  'section', 'article', 'header', 'footer', 'nav', 'main',
-  'strong', 'em', 'b', 'i', 'u', 'br', 'hr',
+  'button', 'input', 'label', 'form', 'a', 'textarea', 'select', 'option',
+  'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot',
+  'section', 'article', 'header', 'footer', 'nav', 'main', 'aside',
+  'strong', 'em', 'b', 'i', 'u', 'br', 'hr', 'small', 'sub', 'sup', 'mark',
   'img', 'figure', 'figcaption',
+  'details', 'summary', // HTML5 disclosure elements
+  'code', 'pre', 'kbd', 'samp', 'var', // コード・プログラミング関連
+  'blockquote', 'cite', 'q', 'abbr', 'dfn', // 引用・定義関連
+  'time', 'address', // セマンティック要素
+  'canvas', // Canvas API用（描画）
   // Phase 1: Basic SVG support (strict security)
   'svg', 'path', 'circle', 'rect', 'ellipse', 'line', 'polygon',
   'g', 'defs', 'title', 'desc'
@@ -110,49 +115,7 @@ const dangerousCSSPatterns = [
   /@namespace/gi
 ];
 
-const dangerousJSPatterns = [
-  /eval\s*\(/gi,
-  /Function\s*\(/gi,
-  /setTimeout\s*\(/gi,
-  /setInterval\s*\(/gi,
-  /document\.write/gi,
-  /document\.cookie/gi,
-  /localStorage/gi,
-  /sessionStorage/gi,
-  /XMLHttpRequest/gi,
-  /fetch\s*\(/gi,
-  /window\./gi,
-  /location\./gi,
-  /navigator\./gi,
-  /history\./gi,
-  /import\s*\(/gi,
-  /require\s*\(/gi,
-  /<script/gi,
-  /<\/script>/gi,
-  /globalThis/gi,
-  /self\./gi,
-  /top\./gi,
-  /parent\./gi,
-  /frames\./gi,
-  /with\s*\(/gi,
-  /constructor/gi,
-  /prototype/gi,
-  /__proto__/gi,
-  /alert\s*\(/gi,
-  /confirm\s*\(/gi,
-  /prompt\s*\(/gi,
-  /open\s*\(/gi,
-  /close\s*\(/gi,
-  /execScript/gi,
-  /createElement\s*\(/gi,
-  /innerHTML/gi,
-  /outerHTML/gi,
-  /insertAdjacentHTML/gi,
-  /document\.domain/gi,
-  /postMessage/gi,
-  /addEventListener/gi,
-  /removeEventListener/gi
-];
+// 削除：dangerousJSPatterns は sanitizeJS 関数内で criticalPatterns として再定義
 
 /**
  * HTMLエンティティエンコーディング
@@ -389,73 +352,37 @@ export function sanitizeJS(js: string): string {
   
   let sanitized = js;
   
-  // Step 1: Remove all dangerous JS patterns
-  dangerousJSPatterns.forEach(pattern => {
-    sanitized = sanitized.replace(pattern, '/* dangerous code removed */');
-  });
-  
-  // Step 2: Remove comments (potential XSS vector)
-  sanitized = sanitized
-    .replace(/\/\*[\s\S]*?\*\//g, '') // multiline comments
-    .replace(/\/\/.*$/gm, ''); // single line comments
-  
-  // Step 3: Remove string literals that could contain dangerous code
-  sanitized = sanitized.replace(/["'`][^"'`]*["'`]/g, (match) => {
-    const content = match.slice(1, -1);
-    if (/(<script|javascript:|vbscript:|data:text\/html)/i.test(content)) {
-      return '""'; // replace dangerous string with empty string
-    }
-    return match;
-  });
-  
-  // Step 4: 許可されたパターンのみを残す（非常に制限的）
-  // Basic DOM operations only
-  const allowedPatterns = [
-    /^[\s\w\-._]+$/m, // Simple identifiers and properties
-    /getElementById\(['"][^'"]*['"]\)/gi,
-    /querySelector\(['"][^'"]*['"]\)/gi,
-    /addEventListener\(['"][^'"]*['"],\s*function\s*\([^)]*\)\s*\{[^}]*\}\s*\)/gi,
-    /classList\.(add|remove|toggle)\(['"][^'"]*['"]\)/gi,
-    /style\.\w+\s*=\s*['"][^'"]*['"]/gi,
-    /textContent\s*=\s*['"][^'"]*['"]/gi,
-    /console\.log\(['"][^'"]*['"]\)/gi
+  // 最も危険なパターンのみを削除（緩和版）
+  const criticalPatterns = [
+    /eval\s*\(/gi,
+    /Function\s*\(/gi,
+    /setTimeout\s*\(\s*['"`][^'"`]*<script/gi,
+    /setInterval\s*\(\s*['"`][^'"`]*<script/gi,
+    /document\.write\s*\(/gi,
+    /document\.writeln\s*\(/gi,
+    /location\s*=\s*['"`]javascript:/gi,
+    /window\s*\[\s*['"`]eval['"`]\s*\]/gi,
+    /\[\s*['"`]constructor['"`]\s*\]/gi,
+    /import\s*\(/gi, // Dynamic imports
+    /require\s*\(/gi, // Node.js requires
+    /<script[^>]*>/gi, // Script tags
+    /javascript:/gi, // JavaScript URLs
+    /vbscript:/gi, // VBScript URLs
+    /data:text\/html/gi, // HTML data URLs
   ];
   
-  // 非常に制限的なアプローチ：許可されたパターン以外は削除
-  const lines = sanitized.split('\n');
-  const cleanedLines = lines.map(line => {
-    const trimmedLine = line.trim();
-    if (!trimmedLine) return line;
-    
-    // 空行やコメント行は許可
-    if (trimmedLine.startsWith('//') || trimmedLine.startsWith('/*')) {
-      return '';
-    }
-    
-    // 許可されたパターンのいずれかにマッチするかチェック
-    const isAllowed = allowedPatterns.some(pattern => pattern.test(trimmedLine));
-    
-    if (isAllowed) {
-      return line;
-    } else {
-      return `/* restricted: ${trimmedLine.substring(0, 50)}... */`;
-    }
+  // 危険なパターンのみを削除
+  criticalPatterns.forEach(pattern => {
+    sanitized = sanitized.replace(pattern, '/* potentially dangerous code removed */');
   });
   
-  sanitized = cleanedLines.join('\n');
-  
-  // Step 5: Final cleanup
+  // 基本的な整形のみ
   sanitized = sanitized
     .replace(/\s+/g, ' ')
     .replace(/;\s*;/g, ';')
     .trim();
   
-  // Step 6: 完全に空になった場合は、安全なコメントを残す
-  if (!sanitized || sanitized.replace(/\/\*.*?\*\//g, '').trim() === '') {
-    return '/* JavaScript content was restricted for security */';
-  }
-  
-  return sanitized;
+  return sanitized || '/* Empty JavaScript content */';
 }
 
 

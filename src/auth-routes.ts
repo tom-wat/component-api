@@ -301,6 +301,15 @@ authRouter.post('/refresh', async (request, env: Env) => {
       });
     }
 
+    if (!env.JWT_SECRET) {
+      return new Response(JSON.stringify({
+        error: 'JWT not configured'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     const jwtManager = JWTManager.fromEnv(env);
     const newTokens = await jwtManager.refreshTokens(refreshToken);
     
