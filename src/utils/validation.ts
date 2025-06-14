@@ -51,7 +51,7 @@ const allowedHTMLAttributes = [
   'type', 'name', 'value', 'placeholder', 'href', 'target',
   'src', 'alt', 'width', 'height', 'title',
   // Phase 1: Basic SVG attributes (safe subset)
-  'viewBox', 'xmlns', 'd', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
+  'viewBox', 'xmlns', 'xmlns:*', 'd', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
   'cx', 'cy', 'r', 'rx', 'ry', 'x', 'y', 'x1', 'y1', 'x2', 'y2',
   'points', 'transform', 'opacity', 'fill-opacity', 'stroke-opacity'
 ];
@@ -131,7 +131,7 @@ function encodeHTMLEntities(str: string): string {
 }
 
 /**
- * SVG専用サニタイズ（Phase 1: 厳格なセキュリティ）
+ * SVG専用サニタイズ（基本機能を保ちつつセキュリティを確保）
  */
 function sanitizeSVG(svgContent: string): string {
   let sanitized = svgContent;
@@ -141,39 +141,11 @@ function sanitizeSVG(svgContent: string): string {
     sanitized = sanitized.replace(pattern, '<!-- removed for security -->');
   });
   
-  // Step 2: SVG属性のセキュリティチェック
-  sanitized = sanitized.replace(/\s+(\w+(?:-\w+)*)\s*=\s*["']([^"']*)["']/gi, (match, attrName, attrValue) => {
-    const attr = attrName.toLowerCase();
-    
-    // 危険な属性を除去
-    if (attr.startsWith('on') || attr === 'href' || attr === 'xlink:href') {
-      return '';
-    }
-    
-    // 外部URL参照を禁止
-    if (attrValue.includes('http://') || attrValue.includes('https://') || attrValue.includes('ftp://')) {
-      return '';
-    }
-    
-    // JavaScript URL禁止
-    if (/javascript:|vbscript:|data:text\/html/i.test(attrValue)) {
-      return '';
-    }
-    
-    return match;
+  // Step 2: SVGタグの属性をメイン関数に委譲（viewBox、xmlns等を正しく処理）
+  sanitized = sanitized.replace(/<(svg|g|path|circle|rect|ellipse|line|polygon|defs|title|desc)\b([^>]*)>/gi, (match, tagName, attributes) => {
+    const cleanAttributes = sanitizeHTMLAttributes(`<${tagName}${attributes}>`);
+    return cleanAttributes;
   });
-  
-  // Step 3: ネストした危険な要素をチェック
-  if (/<svg[^>]*>[\s\S]*<svg/i.test(sanitized)) {
-    // ネストしたSVGは禁止
-    sanitized = sanitized.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, (match) => {
-      const innerSvgCount = (match.match(/<svg/gi) || []).length;
-      if (innerSvgCount > 1) {
-        return '<!-- nested SVG removed for security -->';
-      }
-      return match;
-    });
-  }
   
   return sanitized;
 }
@@ -196,7 +168,7 @@ function sanitizeHTMLTags(html: string): string {
  * HTMLattributesをサニタイズ
  */
 function sanitizeHTMLAttributes(tag: string): string {
-  return tag.replace(/\s+(\w+(?:-\w+)*)\s*=\s*["']([^"']*)["']/gi, (match, attrName, attrValue) => {
+  return tag.replace(/\s+([\w:-]+)\s*=\s*["']([^"']*)["']/gi, (match, attrName, attrValue) => {
     const attr = attrName.toLowerCase();
     
     // 許可された属性のみ残す
@@ -362,7 +334,7 @@ export function sanitizeJS(js: string): string {
     /document\.writeln\s*\(/gi,
     /location\s*=\s*['"`]javascript:/gi,
     /window\s*\[\s*['"`]eval['"`]\s*\]/gi,
-    /\[\s*['"`]constructor['"`]\s*\]/gi,
+    /\[\s*['"`]constructor['"`]\s*\]/gi, // Keep this specific - targets array access only
     /\bimport\s*\(/gi, // Dynamic imports
     /\brequire\s*\(/gi, // Node.js requires
     /<script[^>]*>/gi, // Script tags
