@@ -354,8 +354,8 @@ export function sanitizeJS(js: string): string {
   
   // 最も危険なパターンのみを削除（緩和版）
   const criticalPatterns = [
-    /eval\s*\(/gi,
-    /Function\s*\(/gi,
+    /\beval\s*\(/gi, // eval function calls
+    /\bnew\s+Function\s*\(/gi, // Function constructor (more specific)
     /setTimeout\s*\(\s*['"`][^'"`]*<script/gi,
     /setInterval\s*\(\s*['"`][^'"`]*<script/gi,
     /document\.write\s*\(/gi,
@@ -363,8 +363,8 @@ export function sanitizeJS(js: string): string {
     /location\s*=\s*['"`]javascript:/gi,
     /window\s*\[\s*['"`]eval['"`]\s*\]/gi,
     /\[\s*['"`]constructor['"`]\s*\]/gi,
-    /import\s*\(/gi, // Dynamic imports
-    /require\s*\(/gi, // Node.js requires
+    /\bimport\s*\(/gi, // Dynamic imports
+    /\brequire\s*\(/gi, // Node.js requires
     /<script[^>]*>/gi, // Script tags
     /javascript:/gi, // JavaScript URLs
     /vbscript:/gi, // VBScript URLs
