@@ -51,7 +51,7 @@ const allowedHTMLAttributes = [
   'type', 'name', 'value', 'placeholder', 'href', 'target',
   'src', 'alt', 'width', 'height', 'title',
   // Phase 1: Basic SVG attributes (safe subset)
-  'viewBox', 'xmlns', 'xmlns:*', 'd', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
+  'viewbox', 'xmlns', 'xmlns:*', 'd', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
   'cx', 'cy', 'r', 'rx', 'ry', 'x', 'y', 'x1', 'y1', 'x2', 'y2',
   'points', 'transform', 'opacity', 'fill-opacity', 'stroke-opacity'
 ];
@@ -143,8 +143,8 @@ function sanitizeSVG(svgContent: string): string {
   
   // Step 2: SVGタグの属性をメイン関数に委譲（viewBox、xmlns等を正しく処理）
   sanitized = sanitized.replace(/<(svg|g|path|circle|rect|ellipse|line|polygon|defs|title|desc)\b([^>]*)>/gi, (match, tagName, attributes) => {
-    const cleanAttributes = sanitizeHTMLAttributes(`<${tagName}${attributes}>`);
-    return cleanAttributes;
+    const cleanAttributes = sanitizeHTMLAttributes(attributes);
+    return `<${tagName}${cleanAttributes}>`;
   });
   
   return sanitized;
@@ -155,10 +155,15 @@ function sanitizeSVG(svgContent: string): string {
  */
 function sanitizeHTMLTags(html: string): string {
   // 許可されていないタグを削除
-  return html.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/gi, (match, tagName) => {
+  return html.replace(/<(\/?)([\w-]+)\b([^>]*)>/gi, (match, slash, tagName, attributes) => {
     if (allowedHTMLTags.includes(tagName.toLowerCase())) {
+      // 閉じタグの場合は属性処理をスキップ
+      if (slash === '/') {
+        return `</${tagName}>`;
+      }
       // 許可されたタグの場合、属性もサニタイズ
-      return sanitizeHTMLAttributes(match);
+      const cleanAttributes = sanitizeHTMLAttributes(attributes);
+      return `<${tagName}${cleanAttributes}>`;
     }
     return ''; // 許可されていないタグは削除
   });
