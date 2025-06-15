@@ -132,34 +132,55 @@ router.get('/api/components', async (request, env: Env) => {
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100); // 最大100件
     const offset = parseInt(url.searchParams.get('offset') || '0');
 
-    let query = `
+    // 総件数を取得するクエリ（フィルタ条件は同じ）
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM components 
+      WHERE is_deleted = FALSE
+    `;
+    let countParams: any[] = [];
+
+    // データ取得用のクエリ
+    let dataQuery = `
       SELECT id, name, category, html, css, js, tags, author, 
              created_at, updated_at
       FROM components 
       WHERE is_deleted = FALSE
     `;
-    const params: any[] = [];
+    let dataParams: any[] = [];
 
+    // フィルタ条件を両方のクエリに適用
     if (category && category.trim()) {
-      query += ' AND category = ?';
-      params.push(category.trim());
+      countQuery += ' AND category = ?';
+      dataQuery += ' AND category = ?';
+      countParams.push(category.trim());
+      dataParams.push(category.trim());
     }
 
     if (search && search.trim()) {
-      query += ' AND (name LIKE ? OR tags LIKE ?)';
+      countQuery += ' AND (name LIKE ? OR tags LIKE ?)';
+      dataQuery += ' AND (name LIKE ? OR tags LIKE ?)';
       const searchTerm = `%${search.trim()}%`;
-      params.push(searchTerm, searchTerm);
+      countParams.push(searchTerm, searchTerm);
+      dataParams.push(searchTerm, searchTerm);
     }
 
-    query += ' ORDER BY updated_at DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
+    dataQuery += ' ORDER BY updated_at DESC LIMIT ? OFFSET ?';
+    dataParams.push(limit, offset);
 
-    console.log('Query:', query);
-    console.log('Params:', params);
+    console.log('Count Query:', countQuery);
+    console.log('Count Params:', countParams);
+    console.log('Data Query:', dataQuery);
+    console.log('Data Params:', dataParams);
 
-    const result = await env.DB.prepare(query).bind(...params).all();
+    // 総件数とデータを並行取得
+    const [countResult, dataResult] = await Promise.all([
+      env.DB.prepare(countQuery).bind(...countParams).first(),
+      env.DB.prepare(dataQuery).bind(...dataParams).all()
+    ]);
     
-    const components = result.results.map(row => ({
+    const totalCount = (countResult?.total as number) || 0;
+    const components = dataResult.results.map(row => ({
       ...row,
       tags: JSON.parse(row.tags as string || '[]'),
       createdAt: new Date(row.created_at as string),
@@ -168,8 +189,8 @@ router.get('/api/components', async (request, env: Env) => {
 
     return new Response(JSON.stringify({ 
       components,
-      total: components.length,
-      hasMore: components.length === limit
+      total: totalCount,
+      hasMore: (offset + components.length) < totalCount
     }), {
       headers: { ...headers, 'Content-Type': 'application/json' }
     });
